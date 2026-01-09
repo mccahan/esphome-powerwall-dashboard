@@ -69,7 +69,7 @@ wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
   ap:
-    ssid: "Powerwall-Display Fallback Hotspot"
+    ssid: "Powerwall-Display"
     password: "5OsITduhg5ns"
 
 captive_portal:
