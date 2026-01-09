@@ -491,10 +491,8 @@ interval:
           const float phase_offset_2 = 0.667f;
           
           float phase_1 = id(ph_master);
-          float phase_2 = id(ph_master) + phase_offset_1;
-          if (phase_2 >= 1.0f) phase_2 -= 1.0f;
-          float phase_3 = id(ph_master) + phase_offset_2;
-          if (phase_3 >= 1.0f) phase_3 -= 1.0f;
+          float phase_2 = fmodf(id(ph_master) + phase_offset_1, 1.0f);
+          float phase_3 = fmodf(id(ph_master) + phase_offset_2, 1.0f);
 
           // Apply easing to each phase
           const float eased_t1 = ease_cubic_in_out(phase_1);
