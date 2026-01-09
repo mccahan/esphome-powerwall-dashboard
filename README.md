@@ -2,6 +2,23 @@ This project uses ESPHome as a base to deploy a Tesla Powerwall home monitoring 
 
 It acquires values over MQTT from pypowerwall (which, itself, is able to grab them as they get used elsewhere).
 
+## ESPHome Setup
+
+To use the ESPHome-based firmware:
+
+1. **Configure WiFi credentials**: Copy `secrets.yaml.example` to `secrets.yaml` and update with your WiFi credentials:
+   ```bash
+   cp secrets.yaml.example secrets.yaml
+   # Edit secrets.yaml with your actual WiFi SSID and password
+   ```
+
+2. **Install ESPHome**: Follow the [ESPHome installation guide](https://esphome.io/guides/getting_started_command_line.html)
+
+3. **Compile and upload**: 
+   ```bash
+   esphome run bedside-display.yml
+   ```
+
 ---
 
 ## Native ESP32-S3 LVGL Firmware
