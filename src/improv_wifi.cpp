@@ -19,6 +19,7 @@ ImprovWiFi::ImprovWiFi() {
 
 void ImprovWiFi::begin() {
     Serial.println("Initializing Improv WiFi...");
+    Serial.flush();  // Ensure message is sent before binary data
     
     preferences.begin("wifi", false);
     
@@ -28,10 +29,12 @@ void ImprovWiFi::begin() {
     
     if (savedSSID.length() > 0) {
         Serial.println("Attempting to connect to saved WiFi: " + savedSSID);
+        Serial.flush();
         connectWiFi(savedSSID, savedPassword);
     } else {
         Serial.println("No saved WiFi credentials found");
         Serial.println("Waiting for Improv WiFi provisioning...");
+        Serial.flush();
     }
     
     // Send initial state packet for Improv detection
@@ -189,15 +192,7 @@ void ImprovWiFi::handleRPCCommand(uint8_t command, const std::vector<uint8_t>& d
 }
 
 void ImprovWiFi::sendDeviceInfo() {
-    std::vector<String> info;
-    info.push_back("ESP32-LVGL-Display");  // Firmware name
-    info.push_back("1");                    // Firmware version
-    info.push_back("ESP32-S3");            // Chip family
-    info.push_back("ESP32-S3 Display");    // Device name
-    
-    sendRPCResult(IMPROV_RPC_REQUEST_INFO, info);
-    
-    // Also log to serial for debugging
+    // Log to serial for debugging FIRST
     Serial.println("=== Device Info ===");
     Serial.println("Device: ESP32-S3 LVGL Display");
     Serial.println("Chip: ESP32-S3");
@@ -206,6 +201,15 @@ void ImprovWiFi::sendDeviceInfo() {
     Serial.println("Firmware: 1.0.0");
     Serial.println("Improv Version: 1");
     Serial.println("==================");
+    Serial.flush();
+    
+    std::vector<String> info;
+    info.push_back("ESP32-LVGL-Display");  // Firmware name
+    info.push_back("1");                    // Firmware version
+    info.push_back("ESP32-S3");            // Chip family
+    info.push_back("ESP32-S3 Display");    // Device name
+    
+    sendRPCResult(IMPROV_RPC_REQUEST_INFO, info);
 }
 
 void ImprovWiFi::sendCurrentState() {
@@ -216,11 +220,7 @@ void ImprovWiFi::sendCurrentState() {
         currentState = IMPROV_STATE_READY;
     }
     
-    std::vector<uint8_t> data;
-    data.push_back(currentState);
-    sendPacket(IMPROV_CURRENT_STATE, data);
-    
-    // Debug output
+    // Debug output BEFORE sending binary packet
     Serial.print("Improv State: ");
     switch (currentState) {
         case IMPROV_STATE_READY:
@@ -234,6 +234,11 @@ void ImprovWiFi::sendCurrentState() {
             Serial.println(WiFi.localIP());
             break;
     }
+    Serial.flush();  // Ensure debug output is sent before binary data
+    
+    std::vector<uint8_t> data;
+    data.push_back(currentState);
+    sendPacket(IMPROV_CURRENT_STATE, data);
 }
 
 void ImprovWiFi::sendErrorState(uint8_t error) {
@@ -311,11 +316,15 @@ void ImprovWiFi::sendPacket(uint8_t type, const std::vector<uint8_t>& data) {
     uint8_t checksum = calculateChecksum(packet);
     packet.push_back(checksum);
     
+    // Ensure any pending text output is sent first
+    Serial.flush();
+    
     // Send packet
     Serial.write(packet.data(), packet.size());
     
     // Send newline
     Serial.write('\n');
+    Serial.flush();  // Ensure packet is sent
 }
 
 uint8_t ImprovWiFi::calculateChecksum(const std::vector<uint8_t>& data) {
