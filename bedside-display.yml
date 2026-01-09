@@ -461,32 +461,76 @@ interval:
 
           if (max_active < THRESH_W) {
             hide_dot(id(dot_solar_home));
+            hide_dot(id(dot_solar_home_2));
+            hide_dot(id(dot_solar_home_3));
             hide_dot(id(dot_solar_batt));
+            hide_dot(id(dot_solar_batt_2));
+            hide_dot(id(dot_solar_batt_3));
             hide_dot(id(dot_solar_grid));
+            hide_dot(id(dot_solar_grid_2));
+            hide_dot(id(dot_solar_grid_3));
             hide_dot(id(dot_grid_home));
+            hide_dot(id(dot_grid_home_2));
+            hide_dot(id(dot_grid_home_3));
             hide_dot(id(dot_grid_batt));
+            hide_dot(id(dot_grid_batt_2));
+            hide_dot(id(dot_grid_batt_3));
             hide_dot(id(dot_batt_home));
+            hide_dot(id(dot_batt_home_2));
+            hide_dot(id(dot_batt_home_3));
             hide_dot(id(dot_batt_grid));
+            hide_dot(id(dot_batt_grid_2));
+            hide_dot(id(dot_batt_grid_3));
             return;
           }
 
           id(ph_master) = advance_master_phase(id(ph_master), max_active);
 
-          // Apply easing ONCE, shared by all dots
-          const float eased_t = ease_cubic_in_out(id(ph_master));
+          // Calculate phases for 3 dots evenly spaced
+          const float phase_offset_1 = 0.333f;
+          const float phase_offset_2 = 0.667f;
+          
+          float phase_1 = id(ph_master);
+          float phase_2 = id(ph_master) + phase_offset_1;
+          if (phase_2 >= 1.0f) phase_2 -= 1.0f;
+          float phase_3 = id(ph_master) + phase_offset_2;
+          if (phase_3 >= 1.0f) phase_3 -= 1.0f;
+
+          // Apply easing to each phase
+          const float eased_t1 = ease_cubic_in_out(phase_1);
+          const float eased_t2 = ease_cubic_in_out(phase_2);
+          const float eased_t3 = ease_cubic_in_out(phase_3);
 
           // ------------------------------------------------------------
           // Animate all flows (inactive ones hidden automatically)
           // ------------------------------------------------------------
-          animate(id(dot_solar_home), eased_t, f_s2h, SX, SY, HX, HY);
-          animate(id(dot_solar_batt), eased_t, f_s2b, SX, SY, BX, BY);
-          animate(id(dot_solar_grid), eased_t, f_s2g, SX, SY, GX, GY);
+          animate(id(dot_solar_home),   eased_t1, f_s2h, SX, SY, HX, HY);
+          animate(id(dot_solar_home_2), eased_t2, f_s2h, SX, SY, HX, HY);
+          animate(id(dot_solar_home_3), eased_t3, f_s2h, SX, SY, HX, HY);
+          
+          animate(id(dot_solar_batt),   eased_t1, f_s2b, SX, SY, BX, BY);
+          animate(id(dot_solar_batt_2), eased_t2, f_s2b, SX, SY, BX, BY);
+          animate(id(dot_solar_batt_3), eased_t3, f_s2b, SX, SY, BX, BY);
+          
+          animate(id(dot_solar_grid),   eased_t1, f_s2g, SX, SY, GX, GY);
+          animate(id(dot_solar_grid_2), eased_t2, f_s2g, SX, SY, GX, GY);
+          animate(id(dot_solar_grid_3), eased_t3, f_s2g, SX, SY, GX, GY);
 
-          animate(id(dot_grid_home),  eased_t, f_g2h, GX, GY, HX, HY);
-          animate(id(dot_grid_batt),  eased_t, f_g2b, GX, GY, BX, BY);
+          animate(id(dot_grid_home),    eased_t1, f_g2h, GX, GY, HX, HY);
+          animate(id(dot_grid_home_2),  eased_t2, f_g2h, GX, GY, HX, HY);
+          animate(id(dot_grid_home_3),  eased_t3, f_g2h, GX, GY, HX, HY);
+          
+          animate(id(dot_grid_batt),    eased_t1, f_g2b, GX, GY, BX, BY);
+          animate(id(dot_grid_batt_2),  eased_t2, f_g2b, GX, GY, BX, BY);
+          animate(id(dot_grid_batt_3),  eased_t3, f_g2b, GX, GY, BX, BY);
 
-          animate(id(dot_batt_home),  eased_t, f_b2h, BX, BY, HX, HY);
-          animate(id(dot_batt_grid),  eased_t, f_b2g, BX, BY, GX, GY);
+          animate(id(dot_batt_home),    eased_t1, f_b2h, BX, BY, HX, HY);
+          animate(id(dot_batt_home_2),  eased_t2, f_b2h, BX, BY, HX, HY);
+          animate(id(dot_batt_home_3),  eased_t3, f_b2h, BX, BY, HX, HY);
+          
+          animate(id(dot_batt_grid),    eased_t1, f_b2g, BX, BY, GX, GY);
+          animate(id(dot_batt_grid_2),  eased_t2, f_b2g, BX, BY, GX, GY);
+          animate(id(dot_batt_grid_3),  eased_t3, f_b2g, BX, BY, GX, GY);
 
           // ---- RX pulse dot (rate-limited to 1 Hz) ----
           {
@@ -654,7 +698,47 @@ lvgl:
             floating: true
 
         - obj:
+            id: dot_solar_home_2
+            width: 12
+            height: 12
+            radius: 6
+            bg_color: ${c_line_yellow}
+            bg_opa: 0%
+            border_width: 0
+            floating: true
+
+        - obj:
+            id: dot_solar_home_3
+            width: 12
+            height: 12
+            radius: 6
+            bg_color: ${c_line_yellow}
+            bg_opa: 0%
+            border_width: 0
+            floating: true
+
+        - obj:
             id: dot_solar_batt
+            width: 12
+            height: 12
+            radius: 6
+            bg_color: ${c_line_yellow}
+            bg_opa: 0%
+            border_width: 0
+            floating: true
+
+        - obj:
+            id: dot_solar_batt_2
+            width: 12
+            height: 12
+            radius: 6
+            bg_color: ${c_line_yellow}
+            bg_opa: 0%
+            border_width: 0
+            floating: true
+
+        - obj:
+            id: dot_solar_batt_3
             width: 12
             height: 12
             radius: 6
@@ -674,7 +758,47 @@ lvgl:
             floating: true
 
         - obj:
+            id: dot_solar_grid_2
+            width: 12
+            height: 12
+            radius: 6
+            bg_color: ${c_line_yellow}
+            bg_opa: 0%
+            border_width: 0
+            floating: true
+
+        - obj:
+            id: dot_solar_grid_3
+            width: 12
+            height: 12
+            radius: 6
+            bg_color: ${c_line_yellow}
+            bg_opa: 0%
+            border_width: 0
+            floating: true
+
+        - obj:
             id: dot_grid_home
+            width: 12
+            height: 12
+            radius: 6
+            bg_color: ${c_line_neutral}
+            bg_opa: 0%
+            border_width: 0
+            floating: true
+
+        - obj:
+            id: dot_grid_home_2
+            width: 12
+            height: 12
+            radius: 6
+            bg_color: ${c_line_neutral}
+            bg_opa: 0%
+            border_width: 0
+            floating: true
+
+        - obj:
+            id: dot_grid_home_3
             width: 12
             height: 12
             radius: 6
@@ -694,6 +818,26 @@ lvgl:
             floating: true
 
         - obj:
+            id: dot_grid_batt_2
+            width: 12
+            height: 12
+            radius: 6
+            bg_color: ${c_line_neutral}
+            bg_opa: 0%
+            border_width: 0
+            floating: true
+
+        - obj:
+            id: dot_grid_batt_3
+            width: 12
+            height: 12
+            radius: 6
+            bg_color: ${c_line_neutral}
+            bg_opa: 0%
+            border_width: 0
+            floating: true
+
+        - obj:
             id: dot_batt_home
             width: 12
             height: 12
@@ -704,7 +848,47 @@ lvgl:
             floating: true
 
         - obj:
+            id: dot_batt_home_2
+            width: 12
+            height: 12
+            radius: 6
+            bg_color: ${c_line_green}
+            bg_opa: 0%
+            border_width: 0
+            floating: true
+
+        - obj:
+            id: dot_batt_home_3
+            width: 12
+            height: 12
+            radius: 6
+            bg_color: ${c_line_green}
+            bg_opa: 0%
+            border_width: 0
+            floating: true
+
+        - obj:
             id: dot_batt_grid
+            width: 12
+            height: 12
+            radius: 6
+            bg_color: ${c_line_green}
+            bg_opa: 0%
+            border_width: 0
+            floating: true
+
+        - obj:
+            id: dot_batt_grid_2
+            width: 12
+            height: 12
+            radius: 6
+            bg_color: ${c_line_green}
+            bg_opa: 0%
+            border_width: 0
+            floating: true
+
+        - obj:
+            id: dot_batt_grid_3
             width: 12
             height: 12
             radius: 6
