@@ -88,7 +88,7 @@ substitutions:
 
   screen_height: "480"
   screen_width: "480"
-  screen_rotation: 90
+  screen_rotation: 270
 
   touchscreen_idle_timeout: "30s"
   touchscreen_daytime_brightness: "80%"
