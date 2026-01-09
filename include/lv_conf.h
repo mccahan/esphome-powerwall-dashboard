@@ -26,6 +26,8 @@
 
 #define LV_MEM_CUSTOM 0
 #if LV_MEM_CUSTOM == 0
+    /* Size of LVGL heap in bytes (128KB chosen for ESP32-S3 with good balance 
+       between available RAM and graphics performance) */
     #define LV_MEM_SIZE (128U * 1024U)
     #define LV_MEM_ADR 0
     #define LV_MEM_AUTO_DEFRAG 1

@@ -8,6 +8,7 @@
 
 // Improv serial protocol constants
 #define IMPROV_SERIAL_VERSION 1
+#define MAX_WIFI_ATTEMPTS 20
 
 Preferences preferences;
 
@@ -137,7 +138,7 @@ void ImprovWiFi::connectWiFi(const String& ssid, const String& password) {
     WiFi.begin(ssid.c_str(), password.c_str());
     
     int attempts = 0;
-    while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+    while (WiFi.status() != WL_CONNECTED && attempts < MAX_WIFI_ATTEMPTS) {
         delay(500);
         Serial.print(".");
         attempts++;

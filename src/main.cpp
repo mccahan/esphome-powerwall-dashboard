@@ -9,10 +9,13 @@
 #include "display_driver.h"
 #include "improv_wifi.h"
 
+// Buffer configuration
+#define LVGL_BUFFER_HEIGHT 40
+
 // LVGL display buffer
 static lv_disp_draw_buf_t draw_buf;
-static lv_color_t buf1[DISPLAY_WIDTH * 40];
-static lv_color_t buf2[DISPLAY_WIDTH * 40];
+static lv_color_t buf1[DISPLAY_WIDTH * LVGL_BUFFER_HEIGHT];
+static lv_color_t buf2[DISPLAY_WIDTH * LVGL_BUFFER_HEIGHT];
 static lv_disp_drv_t disp_drv;
 
 // Display driver instance
@@ -102,7 +105,7 @@ void setup() {
     Serial.println("LVGL initialized");
     
     // Initialize display buffer
-    lv_disp_draw_buf_init(&draw_buf, buf1, buf2, DISPLAY_WIDTH * 40);
+    lv_disp_draw_buf_init(&draw_buf, buf1, buf2, DISPLAY_WIDTH * LVGL_BUFFER_HEIGHT);
     
     // Initialize display driver for LVGL
     lv_disp_drv_init(&disp_drv);

@@ -8,6 +8,9 @@
 #include <esp_lcd_panel_ops.h>
 #include <driver/spi_master.h>
 
+// SPI configuration
+#define SPI_SPEED_HZ 2000000
+
 static esp_lcd_panel_handle_t panel_handle = NULL;
 static uint16_t *frame_buffer = NULL;
 
@@ -83,13 +86,13 @@ void DisplayDriver::initDisplay() {
 }
 
 void DisplayDriver::sendCommand(uint8_t cmd) {
-    spi->beginTransaction(SPISettings(2000000, MSBFIRST, SPI_MODE3));
+    spi->beginTransaction(SPISettings(SPI_SPEED_HZ, MSBFIRST, SPI_MODE3));
     spi->transfer(cmd);
     spi->endTransaction();
 }
 
 void DisplayDriver::sendData(uint8_t data) {
-    spi->beginTransaction(SPISettings(2000000, MSBFIRST, SPI_MODE3));
+    spi->beginTransaction(SPISettings(SPI_SPEED_HZ, MSBFIRST, SPI_MODE3));
     spi->transfer(data);
     spi->endTransaction();
 }

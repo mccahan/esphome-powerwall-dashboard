@@ -1,7 +1,7 @@
 #!/bin/bash
 # Build validation script
 
-set -e
+set -euo pipefail
 
 echo "=== ESP32-S3 LVGL Firmware Build Validation ==="
 echo ""
