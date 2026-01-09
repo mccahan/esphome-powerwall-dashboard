@@ -154,6 +154,25 @@ Extend `src/improv_wifi.cpp` to add custom WiFi features, such as:
 2. Clean build: `pio run --target clean`
 3. Check all dependencies are installed
 
+### SHA-256 comparison failed / Boot loop
+
+If you see errors like:
+```
+SHA-256 comparison failed:
+Calculated: cf780b40783e49f19c34ce87853c75dccf8548dc116c9d41cfb6194a2f332177
+Expected: 13a1a0aa54262123c6d1b1ae881977f54f41eddd693e1918c55e35a98727c4b5
+```
+
+This was caused by incorrect flash offsets in the web installer. **This has been fixed** - the web installer now flashes:
+- Bootloader at offset 0x0
+- Partition table at offset 0x8000
+- Application firmware at offset 0x10000
+
+To fix an already-flashed device:
+1. Visit the [web installer](https://mccahan.github.io/esphome-powerwall-dashboard/)
+2. Flash the firmware again using the updated installer
+3. Select "Erase all flash before installing" when prompted
+
 ## License
 
 This project is provided as-is for educational and development purposes.
