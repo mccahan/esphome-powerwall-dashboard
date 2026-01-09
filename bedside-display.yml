@@ -138,7 +138,7 @@ globals:
 # MQTT (subscribe to pypowerwall topics)
 # -------------------------------------------------------------------
 mqtt:
-  broker: !secret
+  broker: !secret mqtt_broker
   port: !secret mqtt_port
   username: !secret mqtt_username
   password: !secret mqtt_password
