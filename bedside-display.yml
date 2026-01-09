@@ -261,6 +261,7 @@ interval:
           const float THRESH_W = 50.0f;
           const float FADE = 0.12f;
           const int DOT_R = 6;
+          const uint32_t DEFAULT_FRAME_MS = 33;  // Initial frame time assumption (~30 FPS)
 
           // ------------------------------------------------------------
           // Helpers
@@ -477,7 +478,7 @@ interval:
           // Calculate elapsed time since last update
           const uint32_t now = millis();
           const uint32_t last_anim = id(g_last_anim_ms);
-          const uint32_t elapsed_ms = (last_anim == 0) ? 33 : (now - last_anim);
+          const uint32_t elapsed_ms = (last_anim == 0) ? DEFAULT_FRAME_MS : (now - last_anim);
           const float dt_seconds = (float)elapsed_ms / 1000.0f;
           id(g_last_anim_ms) = now;
 
