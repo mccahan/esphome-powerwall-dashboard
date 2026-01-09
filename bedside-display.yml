@@ -133,6 +133,9 @@ globals:
   - id: g_last_pulse_ms
     type: uint32_t
     initial_value: "0"
+  - id: g_last_anim_ms
+    type: uint32_t
+    initial_value: "0"
 
 # -------------------------------------------------------------------
 # MQTT (subscribe to pypowerwall topics)
@@ -258,7 +261,6 @@ interval:
           const float THRESH_W = 50.0f;
           const float FADE = 0.12f;
           const int DOT_R = 6;
-          const float DT = 0.04f;        // 100 ms tick
 
           // ------------------------------------------------------------
           // Helpers
@@ -300,9 +302,9 @@ interval:
           // ------------------------------------------------------------
           // Master phase (shared by all dots)
           // ------------------------------------------------------------
-          auto advance_master_phase = [&](float ph, float max_watts_active) -> float {
+          auto advance_master_phase = [&](float ph, float max_watts_active, float dt_seconds) -> float {
             float speed = clampf(max_watts_active / 2500.0f, 0.18f, 1.35f);
-            ph += speed * DT;
+            ph += speed * dt_seconds;
             if (ph >= 1.0f) ph -= floorf(ph);
             return ph;
           };
@@ -472,7 +474,14 @@ interval:
             return;
           }
 
-          id(ph_master) = advance_master_phase(id(ph_master), max_active);
+          // Calculate elapsed time since last update
+          const uint32_t now = millis();
+          const uint32_t last_anim = id(g_last_anim_ms);
+          const uint32_t elapsed_ms = (last_anim == 0) ? 33 : (now - last_anim);
+          const float dt_seconds = (float)elapsed_ms / 1000.0f;
+          id(g_last_anim_ms) = now;
+
+          id(ph_master) = advance_master_phase(id(ph_master), max_active, dt_seconds);
 
           // Calculate phases for 3 dots evenly spaced (120° apart)
           const float phase_offset_1 = 1.0f / 3.0f;
