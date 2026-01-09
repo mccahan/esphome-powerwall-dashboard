@@ -1,1 +1,23 @@
 secrets.yaml
+
+# PlatformIO
+.pio/
+.vscode/
+.platformio/
+
+# Build artifacts
+*.bin
+*.elf
+*.map
+.pioenvs/
+.piolibdeps/
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
