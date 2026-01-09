@@ -45,14 +45,14 @@ lvgl:
           then:
             - light.turn_on:
                 id: display_backlight
-                brightness: ${touchscreen_nighttime_brightness}
+                brightness: ${touchscreen_evening_brightness}
       - if:
           condition:
             - lambda: 'return id(brightness_mode).current_option() == "Night";'
           then:
-            - light.turn_off: display_backlight
-            - lvgl.pause:
-                show_snow: true
+            - light.turn_on:
+                id: display_backlight
+                brightness: ${touchscreen_nighttime_brightness}
 
 # Wake on screen touch
 touchscreen:
@@ -74,7 +74,7 @@ touchscreen:
             then:
               - light.turn_on:
                   id: display_backlight
-                  brightness: ${touchscreen_nighttime_brightness}
+                  brightness: ${touchscreen_evening_brightness}
         - if:
             condition:
               - lambda: 'return id(brightness_mode).current_option() == "Night";'
@@ -112,7 +112,7 @@ select:
             then:
               - light.turn_on:
                   id: display_backlight
-                  brightness: ${touchscreen_nighttime_brightness}
+                  brightness: ${touchscreen_evening_brightness}
         - if:
             condition:
               - lambda: 'return id(brightness_mode).current_option() == "Night";'

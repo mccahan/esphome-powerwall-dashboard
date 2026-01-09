@@ -91,8 +91,9 @@ substitutions:
   screen_rotation: 90
 
   touchscreen_idle_timeout: "30s"
-  touchscreen_daytime_brightness: "80%"
-  touchscreen_nighttime_brightness: "50%"
+  touchscreen_daytime_brightness: "100%"
+  touchscreen_evening_brightness: "70%"
+  touchscreen_nighttime_brightness: "30%"
 
   # LCD backlight modes - Code in backlight.yaml
   # Day mode is set to Sunrise
