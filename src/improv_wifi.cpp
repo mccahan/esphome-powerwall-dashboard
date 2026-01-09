@@ -1,6 +1,6 @@
 /**
  * Improv WiFi Implementation
- * Based on Improv Wi-Fi specification: https://www.improv-wifi.com/
+ * Based on Improv Wi-Fi Serial specification: https://www.improv-wifi.com/
  */
 
 #include "improv_wifi.h"
@@ -13,7 +13,8 @@
 Preferences preferences;
 
 ImprovWiFi::ImprovWiFi() {
-    isProvisioning = false;
+    currentState = IMPROV_STATE_READY;
+    errorState = IMPROV_ERROR_NONE;
     lastStatusUpdate = 0;
 }
 
@@ -34,63 +35,163 @@ void ImprovWiFi::begin() {
         Serial.println("Waiting for Improv WiFi provisioning...");
     }
     
-    // Send device info for Improv
-    sendDeviceInfo();
+    // Send initial state packet for Improv detection
+    delay(100);  // Small delay to ensure serial is ready
+    sendCurrentState();
 }
 
 void ImprovWiFi::loop() {
     // Handle serial commands for Improv WiFi
     handleSerial();
     
-    // Send periodic WiFi status updates
+    // Send periodic state updates
     if (millis() - lastStatusUpdate > 5000) {
-        sendWiFiStatus();
+        sendCurrentState();
         lastStatusUpdate = millis();
     }
 }
 
 void ImprovWiFi::handleSerial() {
-    if (!Serial.available()) {
-        return;
-    }
-    
-    // Read serial data for Improv protocol
-    // This is a simplified implementation
-    // Full implementation would parse Improv serial protocol messages
-    
-    String input = Serial.readStringUntil('\n');
-    input.trim();
-    
-    // Simple command handling for testing
-    if (input.startsWith("WIFI:")) {
-        // Format: WIFI:ssid,password
-        int commaPos = input.indexOf(',', 5);
-        if (commaPos > 0) {
-            String ssid = input.substring(5, commaPos);
-            String password = input.substring(commaPos + 1);
-            
-            Serial.println("Attempting to connect to: " + ssid);
-            connectWiFi(ssid, password);
-        }
-    } else if (input == "STATUS") {
-        sendWiFiStatus();
-    } else if (input == "INFO") {
-        sendDeviceInfo();
-    } else if (input == "SCAN") {
-        Serial.println("Scanning for WiFi networks...");
-        int n = WiFi.scanNetworks();
-        Serial.println("Networks found: " + String(n));
-        for (int i = 0; i < n; i++) {
-            Serial.printf("  %d: %s (%d dBm) %s\n", 
-                         i + 1, 
-                         WiFi.SSID(i).c_str(), 
-                         WiFi.RSSI(i),
-                         (WiFi.encryptionType(i) == WIFI_AUTH_OPEN) ? "Open" : "Encrypted");
+    while (Serial.available()) {
+        uint8_t byte = Serial.read();
+        inputBuffer.push_back(byte);
+        
+        // Check if we have enough bytes to determine if it's an Improv packet
+        if (inputBuffer.size() >= 9) {
+            // Check for "IMPROV" header
+            if (inputBuffer[0] == 'I' && inputBuffer[1] == 'M' && 
+                inputBuffer[2] == 'P' && inputBuffer[3] == 'R' && 
+                inputBuffer[4] == 'O' && inputBuffer[5] == 'V') {
+                
+                uint8_t version = inputBuffer[6];
+                uint8_t type = inputBuffer[7];
+                uint8_t length = inputBuffer[8];
+                
+                // Wait for complete packet: header(6) + version(1) + type(1) + length(1) + data(length) + checksum(1)
+                uint16_t expectedSize = 9 + length + 1;
+                
+                if (inputBuffer.size() >= expectedSize) {
+                    // Verify checksum
+                    uint8_t receivedChecksum = inputBuffer[expectedSize - 1];
+                    uint8_t calculatedChecksum = 0;
+                    for (size_t i = 0; i < expectedSize - 1; i++) {
+                        calculatedChecksum += inputBuffer[i];
+                    }
+                    
+                    if (receivedChecksum == calculatedChecksum) {
+                        // Valid packet - handle it
+                        if (type == IMPROV_RPC && version == IMPROV_SERIAL_VERSION) {
+                            if (length > 0) {
+                                uint8_t command = inputBuffer[9];
+                                std::vector<uint8_t> data(inputBuffer.begin() + 10, inputBuffer.begin() + 9 + length);
+                                handleRPCCommand(command, data);
+                            }
+                        }
+                    } else {
+                        Serial.println("Improv: Checksum mismatch");
+                    }
+                    
+                    // Clear buffer
+                    inputBuffer.clear();
+                }
+            } else {
+                // Not an Improv packet - clear the first byte
+                inputBuffer.erase(inputBuffer.begin());
+            }
         }
     }
 }
 
+void ImprovWiFi::handleRPCCommand(uint8_t command, const std::vector<uint8_t>& data) {
+    Serial.printf("Improv RPC Command: 0x%02X\n", command);
+    
+    switch (command) {
+        case IMPROV_RPC_REQUEST_STATE:
+            Serial.println("Request: Current State");
+            sendCurrentState();
+            // If already provisioned, send the redirect URL
+            if (currentState == IMPROV_STATE_PROVISIONED) {
+                std::vector<String> urls;
+                urls.push_back("http://" + WiFi.localIP().toString());
+                sendRPCResult(command, urls);
+            }
+            break;
+            
+        case IMPROV_RPC_REQUEST_INFO:
+            Serial.println("Request: Device Info");
+            sendDeviceInfo();
+            break;
+            
+        case IMPROV_RPC_REQUEST_SCAN:
+            Serial.println("Request: WiFi Scan");
+            {
+                int n = WiFi.scanNetworks();
+                Serial.printf("Found %d networks\n", n);
+                
+                for (int i = 0; i < n; i++) {
+                    std::vector<String> network;
+                    network.push_back(WiFi.SSID(i));
+                    network.push_back(String(WiFi.RSSI(i)));
+                    network.push_back((WiFi.encryptionType(i) == WIFI_AUTH_OPEN) ? "NO" : "YES");
+                    sendRPCResult(command, network);
+                }
+                
+                // Send empty result to signal end of scan
+                std::vector<String> empty;
+                sendRPCResult(command, empty);
+            }
+            break;
+            
+        case IMPROV_RPC_SEND_WIFI:
+            Serial.println("Request: Send WiFi Settings");
+            {
+                // Parse WiFi credentials from data
+                // Format: <ssid_length><ssid><password_length><password>
+                if (data.size() >= 2) {
+                    uint8_t ssidLength = data[0];
+                    if (data.size() >= 1 + ssidLength + 1) {
+                        String ssid;
+                        for (int i = 0; i < ssidLength; i++) {
+                            ssid += (char)data[1 + i];
+                        }
+                        
+                        uint8_t passwordLength = data[1 + ssidLength];
+                        String password;
+                        for (int i = 0; i < passwordLength; i++) {
+                            password += (char)data[1 + ssidLength + 1 + i];
+                        }
+                        
+                        Serial.printf("Connecting to: %s\n", ssid.c_str());
+                        connectWiFi(ssid, password);
+                        
+                        if (currentState == IMPROV_STATE_PROVISIONED) {
+                            // Send success with redirect URL
+                            std::vector<String> result;
+                            result.push_back("http://" + WiFi.localIP().toString());
+                            sendRPCResult(command, result);
+                        }
+                    }
+                }
+            }
+            break;
+            
+        default:
+            Serial.printf("Unknown RPC command: 0x%02X\n", command);
+            sendErrorState(IMPROV_ERROR_UNKNOWN_RPC);
+            break;
+    }
+}
+
 void ImprovWiFi::sendDeviceInfo() {
+    std::vector<String> info;
+    info.push_back("ESP32-LVGL-Display");  // Firmware name
+    info.push_back("1");                    // Firmware version
+    info.push_back("ESP32-S3");            // Chip family
+    info.push_back("ESP32-S3 Display");    // Device name
+    
+    sendRPCResult(IMPROV_RPC_REQUEST_INFO, info);
+    
+    // Also log to serial for debugging
     Serial.println("=== Device Info ===");
     Serial.println("Device: ESP32-S3 LVGL Display");
     Serial.println("Chip: ESP32-S3");
@@ -101,38 +202,117 @@ void ImprovWiFi::sendDeviceInfo() {
     Serial.println("==================");
 }
 
-void ImprovWiFi::sendWiFiStatus() {
-    Serial.print("WiFi Status: ");
+void ImprovWiFi::sendCurrentState() {
+    // Update state based on WiFi connection
+    if (WiFi.status() == WL_CONNECTED) {
+        currentState = IMPROV_STATE_PROVISIONED;
+    } else {
+        currentState = IMPROV_STATE_READY;
+    }
     
-    switch (WiFi.status()) {
-        case WL_CONNECTED:
-            Serial.println("Connected");
-            Serial.print("  SSID: ");
-            Serial.println(WiFi.SSID());
-            Serial.print("  IP: ");
+    std::vector<uint8_t> data;
+    data.push_back(currentState);
+    sendPacket(IMPROV_CURRENT_STATE, data);
+    
+    // Debug output
+    Serial.print("Improv State: ");
+    switch (currentState) {
+        case IMPROV_STATE_READY:
+            Serial.println("READY");
+            break;
+        case IMPROV_STATE_PROVISIONING:
+            Serial.println("PROVISIONING");
+            break;
+        case IMPROV_STATE_PROVISIONED:
+            Serial.print("PROVISIONED - IP: ");
             Serial.println(WiFi.localIP());
-            Serial.print("  RSSI: ");
-            Serial.print(WiFi.RSSI());
-            Serial.println(" dBm");
-            break;
-        case WL_NO_SSID_AVAIL:
-            Serial.println("No SSID Available");
-            break;
-        case WL_CONNECT_FAILED:
-            Serial.println("Connection Failed");
-            break;
-        case WL_DISCONNECTED:
-            Serial.println("Disconnected");
-            break;
-        default:
-            Serial.println("Unknown");
             break;
     }
+}
+
+void ImprovWiFi::sendErrorState(uint8_t error) {
+    errorState = (ImprovSerialErrorState)error;
+    std::vector<uint8_t> data;
+    data.push_back(error);
+    sendPacket(IMPROV_ERROR_STATE, data);
+    
+    Serial.printf("Improv Error: 0x%02X\n", error);
+}
+
+void ImprovWiFi::sendRPCResult(uint8_t command, const std::vector<String>& strings) {
+    std::vector<uint8_t> data;
+    data.push_back(command);
+    
+    // Build string list
+    std::vector<uint8_t> stringData = buildStringList(strings);
+    data.push_back(stringData.size());  // Total length of string data
+    data.insert(data.end(), stringData.begin(), stringData.end());
+    
+    sendPacket(IMPROV_RPC_RESULT, data);
+}
+
+std::vector<uint8_t> ImprovWiFi::buildStringList(const std::vector<String>& strings) {
+    std::vector<uint8_t> result;
+    
+    for (const String& str : strings) {
+        result.push_back(str.length());
+        for (size_t i = 0; i < str.length(); i++) {
+            result.push_back(str[i]);
+        }
+    }
+    
+    return result;
+}
+
+void ImprovWiFi::sendPacket(uint8_t type, const std::vector<uint8_t>& data) {
+    std::vector<uint8_t> packet;
+    
+    // Add "IMPROV" header
+    packet.push_back('I');
+    packet.push_back('M');
+    packet.push_back('P');
+    packet.push_back('R');
+    packet.push_back('O');
+    packet.push_back('V');
+    
+    // Add version
+    packet.push_back(IMPROV_SERIAL_VERSION);
+    
+    // Add type
+    packet.push_back(type);
+    
+    // Add length
+    packet.push_back(data.size());
+    
+    // Add data
+    packet.insert(packet.end(), data.begin(), data.end());
+    
+    // Calculate and add checksum
+    uint8_t checksum = calculateChecksum(packet);
+    packet.push_back(checksum);
+    
+    // Send packet
+    Serial.write(packet.data(), packet.size());
+    
+    // Send newline
+    Serial.write('\n');
+}
+
+uint8_t ImprovWiFi::calculateChecksum(const std::vector<uint8_t>& data) {
+    uint8_t checksum = 0;
+    for (uint8_t byte : data) {
+        checksum += byte;
+    }
+    return checksum;
 }
 
 void ImprovWiFi::connectWiFi(const String& ssid, const String& password) {
     Serial.println("Connecting to WiFi...");
     Serial.println("SSID: " + ssid);
+    
+    // Set state to provisioning
+    currentState = IMPROV_STATE_PROVISIONING;
+    sendCurrentState();
     
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid.c_str(), password.c_str());
@@ -155,9 +335,16 @@ void ImprovWiFi::connectWiFi(const String& ssid, const String& password) {
         preferences.putString("ssid", ssid);
         preferences.putString("password", password);
         
-        sendWiFiStatus();
+        // Update state to provisioned
+        currentState = IMPROV_STATE_PROVISIONED;
+        errorState = IMPROV_ERROR_NONE;
+        sendCurrentState();
     } else {
         Serial.println("WiFi Connection Failed!");
-        sendWiFiStatus();
+        
+        // Set error state
+        currentState = IMPROV_STATE_READY;
+        sendCurrentState();
+        sendErrorState(IMPROV_ERROR_UNABLE_TO_CONNECT);
     }
 }
