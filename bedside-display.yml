@@ -486,9 +486,9 @@ interval:
 
           id(ph_master) = advance_master_phase(id(ph_master), max_active);
 
-          // Calculate phases for 3 dots evenly spaced
-          const float phase_offset_1 = 1.0f / 3.0f;  // 120 degrees
-          const float phase_offset_2 = 2.0f / 3.0f;  // 240 degrees
+          // Calculate phases for 3 dots evenly spaced (120° apart)
+          const float phase_offset_1 = 1.0f / 3.0f;
+          const float phase_offset_2 = 2.0f / 3.0f;
           
           const float phase_1 = id(ph_master);
           const float phase_2 = fmodf(id(ph_master) + phase_offset_1, 1.0f);
