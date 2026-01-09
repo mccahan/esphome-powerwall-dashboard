@@ -12,6 +12,8 @@
 #include <vector>
 
 // Improv Serial Protocol Constants
+#define IMPROV_SERIAL_VERSION 1
+
 enum ImprovSerialMessageType {
     IMPROV_CURRENT_STATE = 0x01,
     IMPROV_ERROR_STATE = 0x02,

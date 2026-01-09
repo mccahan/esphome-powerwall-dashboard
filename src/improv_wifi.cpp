@@ -7,7 +7,6 @@
 #include <Preferences.h>
 
 // Improv serial protocol constants
-#define IMPROV_SERIAL_VERSION 1
 #define MAX_WIFI_ATTEMPTS 20
 
 Preferences preferences;
@@ -66,6 +65,13 @@ void ImprovWiFi::handleSerial() {
                 uint8_t version = inputBuffer[6];
                 uint8_t type = inputBuffer[7];
                 uint8_t length = inputBuffer[8];
+                
+                // Validate length to prevent buffer issues
+                if (length > 200) {  // Reasonable max length for Improv packets
+                    Serial.println("Improv: Packet length too large");
+                    inputBuffer.clear();
+                    continue;
+                }
                 
                 // Wait for complete packet: header(6) + version(1) + type(1) + length(1) + data(length) + checksum(1)
                 uint16_t expectedSize = 9 + length + 1;
@@ -245,6 +251,13 @@ void ImprovWiFi::sendRPCResult(uint8_t command, const std::vector<String>& strin
     
     // Build string list
     std::vector<uint8_t> stringData = buildStringList(strings);
+    
+    // Check if total length fits in uint8_t
+    if (stringData.size() > 255) {
+        Serial.println("Improv: String data too large for packet");
+        return;
+    }
+    
     data.push_back(stringData.size());  // Total length of string data
     data.insert(data.end(), stringData.begin(), stringData.end());
     
@@ -255,8 +268,15 @@ std::vector<uint8_t> ImprovWiFi::buildStringList(const std::vector<String>& stri
     std::vector<uint8_t> result;
     
     for (const String& str : strings) {
-        result.push_back(str.length());
-        for (size_t i = 0; i < str.length(); i++) {
+        // Truncate strings that are too long
+        size_t len = str.length();
+        if (len > 255) {
+            len = 255;
+            Serial.println("Improv: String truncated to 255 bytes");
+        }
+        
+        result.push_back(len);
+        for (size_t i = 0; i < len; i++) {
             result.push_back(str[i]);
         }
     }
