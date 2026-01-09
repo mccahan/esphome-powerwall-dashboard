@@ -478,7 +478,15 @@ interval:
           // Calculate elapsed time since last update
           const uint32_t now = millis();
           const uint32_t last_anim = id(g_last_anim_ms);
-          const uint32_t elapsed_ms = (last_anim == 0) ? DEFAULT_FRAME_MS : (now - last_anim);
+          uint32_t elapsed_ms;
+          
+          // Handle first run and millis() rollover (every ~49.7 days)
+          if (last_anim == 0 || now < last_anim) {
+            elapsed_ms = DEFAULT_FRAME_MS;
+          } else {
+            elapsed_ms = now - last_anim;
+          }
+          
           const float dt_seconds = (float)elapsed_ms / 1000.0f;
           id(g_last_anim_ms) = now;
 
