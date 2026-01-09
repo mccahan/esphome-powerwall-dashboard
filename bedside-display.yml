@@ -317,17 +317,20 @@ interval:
                                                 int x_sink, int y_sink) {
             t = clampf(t, 0.0f, 1.0f);
 
+            const float MIDPOINT = 0.5f;       // Split point between segments
+            const float SEGMENT_SCALE = 2.0f;  // Scale factor to map 0.5 range to 1.0
+            
             int x, y;
             float segment_t;
             
-            if (t < 0.5f) {
+            if (t < MIDPOINT) {
               // First segment: source → center
-              segment_t = t * 2.0f;  // Map 0.0-0.5 to 0.0-1.0
+              segment_t = t * SEGMENT_SCALE;  // Map 0.0-0.5 to 0.0-1.0
               x = lerp_i(x_src, CX, segment_t);
               y = lerp_i(y_src, CY, segment_t);
             } else {
               // Second segment: center → sink
-              segment_t = (t - 0.5f) * 2.0f;  // Map 0.5-1.0 to 0.0-1.0
+              segment_t = (t - MIDPOINT) * SEGMENT_SCALE;  // Map 0.5-1.0 to 0.0-1.0
               x = lerp_i(CX, x_sink, segment_t);
               y = lerp_i(CY, y_sink, segment_t);
             }
