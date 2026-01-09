@@ -1,0 +1,48 @@
+substitutions:
+  # Required vars from the include:
+  # uid, row, column, text
+  tile_radius: "18"
+  tile_pad: "10"
+
+lvgl:
+  pages:
+    - id: main_page
+      widgets:
+        - container:
+            id: ${uid}_tile
+            grid_cell_row_pos: ${row}
+            grid_cell_column_pos: ${column}
+            grid_cell_x_align: stretch
+            grid_cell_y_align: stretch
+            width: 100%
+            height: 100%
+            pad_all: ${tile_pad}
+            radius: ${tile_radius}
+            bg_opa: cover
+            bg_color: $button_off_color
+            border_width: 0
+
+            widgets:
+              - label:
+                  id: ${uid}_icon
+                  text_font: $icon_font
+                  text_color: $icon_off_color
+                  align: top_mid
+                  y: 6
+                  text: "?"
+
+              - label:
+                  id: ${uid}_label
+                  text_font: $text_font
+                  text_color: $label_off_color
+                  align: center
+                  y: 10
+                  text: "${text}"
+
+              - label:
+                  id: ${uid}_status
+                  text_font: $text_font
+                  text_color: $label_off_color
+                  align: bottom_mid
+                  y: -4
+                  text: "—"

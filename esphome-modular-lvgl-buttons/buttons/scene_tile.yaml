@@ -1,0 +1,69 @@
+substitutions:
+  # required: uid, row, column, text, entity_id
+  # optional: icon
+  icon: $mdi_weather_night
+
+packages:
+  _tile_base_${uid}: !include
+    file: tile_base.yaml
+    vars:
+      uid: ${uid}
+      row: ${row}
+      column: ${column}
+      text: ${text}
+
+# Set initial icon on boot
+esphome:
+  on_boot:
+    - priority: -50
+      then:
+        - lvgl.label.update:
+            id: ${uid}_icon
+            text: ${icon}
+
+script:
+  - id: ${uid}_flash
+    then:
+      - lvgl.obj.update:
+          id: ${uid}_tile
+          bg_color: $button_on_color
+      - lvgl.label.update:
+          id: ${uid}_icon
+          text: ${icon}
+          text_color: $icon_on_color
+      - lvgl.label.update:
+          id: ${uid}_label
+          text_color: $label_on_color
+      - lvgl.label.update:
+          id: ${uid}_status
+          text: "Ran"
+          text_color: $label_on_color
+      - delay: 700ms
+      - lvgl.obj.update:
+          id: ${uid}_tile
+          bg_color: $button_off_color
+      - lvgl.label.update:
+          id: ${uid}_icon
+          text: ${icon}
+          text_color: $icon_off_color
+      - lvgl.label.update:
+          id: ${uid}_label
+          text_color: $label_off_color
+      - lvgl.label.update:
+          id: ${uid}_status
+          text: "—"
+          text_color: $label_off_color
+
+lvgl:
+  pages:
+    - id: main_page
+      widgets:
+        - container:
+            id: ${uid}_tile
+            on_click:
+              then:
+                - homeassistant.service:
+                    service: scene.turn_on
+                    data:
+                      entity_id: ${entity_id}
+                - script.execute: ${uid}_flash

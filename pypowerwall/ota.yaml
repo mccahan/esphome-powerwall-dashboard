@@ -1,0 +1,112 @@
+# https://github.com/agillis/esphome-modular-lvgl-buttons/blob/7abfa5745f31b0ac8a6ef43adb8ae115785dc18d/common/ota.yaml
+---
+ota:
+  - platform: web_server
+  - platform: esphome
+    id: ota_state
+    on_begin: 
+      - logger.log: "OTA Start"
+      - light.turn_on: display_backlight
+      - lambda: "id(display_backlight).loop();"
+      - lvgl.resume:
+      - lvgl.widget.redraw:
+      - lvgl.label.update:
+          id: ota_label_primary
+          text: 'Starting OTA...'
+      - lvgl.label.update:
+          id: ota_label_secondary
+          text: 'Wait...'
+      - lvgl.widget.show: ota_widget
+      - lvgl.resume:
+      - lvgl.widget.redraw:
+      - lambda: "id(lvgl_component).loop();"
+      - lambda: "id(lvgl_component).loop();"
+      - logger.log: "OTA widget shown"
+
+    on_progress: 
+      - lvgl.bar.update:
+          id: ota_bar_value
+          value: !lambda return (int)x;
+      - lvgl.label.update:
+          id: ota_label_primary
+          text: " "
+      - lvgl.label.update:
+          id: ota_label_secondary
+          text: !lambda |-
+            static char buffer[64];
+            snprintf(buffer, sizeof(buffer), "Firmware uploading %.1f%%", x);
+            return buffer;
+      - lambda: "id(lvgl_component).loop();"
+
+    on_end:
+      - logger.log: "OTA End"
+      - lvgl.bar.update:
+          id: ota_bar_value
+          value: 100
+      - lvgl.label.update:
+          id: ota_label_primary
+          text: 'Update complete'
+      - lvgl.label.update:
+          id: ota_label_secondary
+          text: 'Rebooting...'
+      - lambda: |-
+          id(lvgl_component).loop();
+
+    on_error:
+      - logger.log:
+            format: "OTA update error %d"
+            args: ["x"]
+      - lvgl.label.update:
+          id: ota_label_primary
+          text: 'Update ERROR'
+      - lvgl.label.update:
+          id: ota_label_secondary
+          text: 'Rebooting...'
+      - lambda: |-
+          id(lvgl_component).loop();   
+
+lvgl:
+  id: lvgl_component
+  top_layer:
+    widgets:
+      - obj:
+          id: ota_widget
+          hidden: true
+          width: $screen_width
+          height: $screen_height
+          align: center
+          clickable: false
+          bg_color: "0x0A0C10"
+          opa: COVER
+          bg_opa: COVER
+          radius: 0
+          widgets:
+            - label:
+                id: ota_label_primary
+                y: -50
+                align: center
+                text_font: space_bold
+                text_color: "0xB0C4DE"
+                text: "Starting OTA"
+            - label:
+                id: ota_label_secondary
+                y: -20
+                align: center
+                text_font: space_bold
+                text_color: "0xB0C4DE"
+                text: "Wait..."
+            - bar:
+                id: ota_bar_value
+                y: 20
+                width: 300
+                value: 0
+                align: center
+                min_value: 0
+                max_value: 100
+                animated: true
+                bg_color: "0x16181C"
+                border_width: 1
+                border_color: "0x2B2C30"
+                indicator:
+                  bg_color: "0x22C55E"
+                  bg_opa: 100%

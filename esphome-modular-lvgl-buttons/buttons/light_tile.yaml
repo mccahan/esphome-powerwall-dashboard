@@ -1,0 +1,72 @@
+substitutions:
+  # required: uid, row, column, text, entity_id
+  # optional: icon_on, icon_off
+  icon_on: $mdi_lightbulb
+  icon_off: $mdi_lightbulb
+
+packages:
+  _tile_base_${uid}: !include
+    file: tile_base.yaml
+    vars:
+      uid: ${uid}
+      row: ${row}
+      column: ${column}
+      text: ${text}
+
+text_sensor:
+  - platform: homeassistant
+    id: ${uid}_state
+    entity_id: ${entity_id}
+    on_value:
+      then:
+        - script.execute: ${uid}_refresh
+
+script:
+  - id: ${uid}_refresh
+    then:
+      - if:
+          condition:
+            lambda: 'return id(${uid}_state).state == "on";'
+          then:
+            - lvgl.obj.update:
+                id: ${uid}_tile
+                bg_color: $button_on_color
+            - lvgl.label.update:
+                id: ${uid}_icon
+                text: ${icon_on}
+                text_color: $icon_on_color
+            - lvgl.label.update:
+                id: ${uid}_label
+                text_color: $label_on_color
+            - lvgl.label.update:
+                id: ${uid}_status
+                text: "On"
+                text_color: $label_on_color
+          else:
+            - lvgl.obj.update:
+                id: ${uid}_tile
+                bg_color: $button_off_color
+            - lvgl.label.update:
+                id: ${uid}_icon
+                text: ${icon_off}
+                text_color: $icon_off_color
+            - lvgl.label.update:
+                id: ${uid}_label
+                text_color: $label_off_color
+            - lvgl.label.update:
+                id: ${uid}_status
+                text: "Off"
+                text_color: $label_off_color
+
+lvgl:
+  pages:
+    - id: main_page
+      widgets:
+        - container:
+            id: ${uid}_tile
+            on_click:
+              then:
+                - homeassistant.service:
+                    service: homeassistant.toggle
+                    data:
+                      entity_id: ${entity_id}

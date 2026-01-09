@@ -1,0 +1,96 @@
+substitutions:
+  # required: uid, row, column, text, entity_id
+  # optional: icon_closed, icon_open
+  icon_closed: $mdi_garage
+  icon_open: $mdi_garage_open
+
+packages:
+  _tile_base_${uid}: !include
+    file: tile_base.yaml
+    vars:
+      uid: ${uid}
+      row: ${row}
+      column: ${column}
+      text: ${text}
+
+text_sensor:
+  - platform: homeassistant
+    id: ${uid}_state
+    entity_id: ${entity_id}
+    on_value:
+      then:
+        - script.execute: ${uid}_refresh
+
+script:
+  - id: ${uid}_refresh
+    then:
+      - if:
+          condition:
+            lambda: |-
+              auto s = id(${uid}_state).state;
+              return (s == "open" || s == "opening");
+          then:
+            - lvgl.obj.update:
+                id: ${uid}_tile
+                bg_color: $button_on_color
+            - lvgl.label.update:
+                id: ${uid}_icon
+                text: ${icon_open}
+                text_color: $icon_on_color
+            - lvgl.label.update:
+                id: ${uid}_label
+                text_color: $label_on_color
+            - lvgl.label.update:
+                id: ${uid}_status
+                text: !lambda |-
+                  auto s = id(${uid}_state).state;
+                  if (s == "opening") return std::string("Opening");
+                  return std::string("Open");
+                text_color: $label_on_color
+          else:
+            - lvgl.obj.update:
+                id: ${uid}_tile
+                bg_color: $button_off_color
+            - lvgl.label.update:
+                id: ${uid}_icon
+                text: ${icon_closed}
+                text_color: $icon_off_color
+            - lvgl.label.update:
+                id: ${uid}_label
+                text_color: $label_off_color
+            - lvgl.label.update:
+                id: ${uid}_status
+                text: !lambda |-
+                  auto s = id(${uid}_state).state;
+                  if (s == "closing") return std::string("Closing");
+                  if (s == "closed") return std::string("Closed");
+                  return s;
+                text_color: $label_off_color
+
+lvgl:
+  pages:
+    - id: main_page
+      widgets:
+        - container:
+            id: ${uid}_tile
+            on_click:
+              then:
+                - if:
+                    condition:
+                      lambda: 'return id(${uid}_state).state == "closed" || id(${uid}_state).state == "closing";'
+                    then:
+                      - homeassistant.service:
+                          service: cover.open_cover
+                          data:
+                            entity_id: ${entity_id}
+                    else:
+                      - homeassistant.service:
+                          service: cover.close_cover
+                          data:
+                            entity_id: ${entity_id}
+            on_long_press:
+              then:
+                - homeassistant.service:
+                    service: cover.stop_cover
+                    data:
+                      entity_id: ${entity_id}
