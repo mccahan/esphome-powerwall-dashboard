@@ -133,6 +133,9 @@ globals:
   - id: g_last_pulse_ms
     type: uint32_t
     initial_value: "0"
+  - id: g_last_anim_ms
+    type: uint32_t
+    initial_value: "0"
 
 # -------------------------------------------------------------------
 # MQTT (subscribe to pypowerwall topics)
@@ -258,7 +261,7 @@ interval:
           const float THRESH_W = 50.0f;
           const float FADE = 0.12f;
           const int DOT_R = 6;
-          const float DT = 0.04f;        // 100 ms tick
+          const uint32_t DEFAULT_FRAME_MS = 1000 / 30;  // ~30 FPS initial assumption
 
           // ------------------------------------------------------------
           // Helpers
@@ -291,65 +294,53 @@ interval:
           };
 
 
-          // Cubic ease-in-out that never fully stops (non-zero slope at ends)
-          auto ease_cubic_in_out = [&](float t) -> float {
-            t = clampf(t, 0.0f, 1.0f);
-
-            // standard cubic in/out
-            float cubic = (t < 0.5f)
-              ? 4.0f * t * t * t
-              : 1.0f - powf(-2.0f * t + 2.0f, 3.0f) * 0.5f;
-
-            // blend in a small linear component to keep motion alive
-            const float k = 0.06f;   // 0 = full stop, ~0.04–0.08 feels good on LVGL
-            return cubic * (1.0f - k) + t * k;
+          // Linear easing (no easing, just returns t)
+          auto ease_linear = [&](float t) -> float {
+            return clampf(t, 0.0f, 1.0f);
           };
 
 
           // ------------------------------------------------------------
           // Master phase (shared by all dots)
           // ------------------------------------------------------------
-          auto advance_master_phase = [&](float ph, float max_watts_active) -> float {
+          auto advance_master_phase = [&](float ph, float max_watts_active, float dt_seconds) -> float {
             float speed = clampf(max_watts_active / 2500.0f, 0.18f, 1.35f);
-            ph += speed * DT;
+            ph += speed * dt_seconds;
             if (ph >= 1.0f) ph -= floorf(ph);
             return ph;
           };
 
           // ------------------------------------------------------------
-          // Place dot along SOURCE → CENTER → SINK
-          // using EASED normalized time
+          // Place dot on a two-segment path: source → center → sink
+          // Phase 0.0-0.5: source → center
+          // Phase 0.5-1.0: center → sink
           // ------------------------------------------------------------
-          auto place_on_via_center = [&](lv_obj_t* dot, float t,
-                                         int x0, int y0,
-                                         int xc, int yc,
-                                         int x1, int y1) {
+          auto place_on_two_segment_path = [&](lv_obj_t* dot, float t,
+                                                int x_src, int y_src,
+                                                int x_sink, int y_sink) {
             t = clampf(t, 0.0f, 1.0f);
 
-            float dx0 = (float)(xc - x0), dy0 = (float)(yc - y0);
-            float dx1 = (float)(x1 - xc), dy1 = (float)(y1 - yc);
-
-            float len0 = sqrtf(dx0*dx0 + dy0*dy0);
-            float len1 = sqrtf(dx1*dx1 + dy1*dy1);
-            float total = len0 + len1;
-            if (total < 1e-3f) total = 1.0f;
-
-            float s = t * total;
-
+            const float MIDPOINT = 0.5f;       // Split point between segments
+            const float SEGMENT_SCALE = 2.0f;  // Scale factor to map 0.5 range to 1.0
+            
             int x, y;
-            if (s <= len0 || len1 < 1e-3f) {
-              float u = (len0 < 1e-3f) ? 1.0f : (s / len0);
-              x = lerp_i(x0, xc, u);
-              y = lerp_i(y0, yc, u);
+            float segment_t;
+            
+            if (t < MIDPOINT) {
+              // First segment: source → center
+              segment_t = t * SEGMENT_SCALE;  // Map 0.0-0.5 to 0.0-1.0
+              x = lerp_i(x_src, CX, segment_t);
+              y = lerp_i(y_src, CY, segment_t);
             } else {
-              float u = (s - len0) / len1;
-              x = lerp_i(xc, x1, u);
-              y = lerp_i(yc, y1, u);
+              // Second segment: center → sink
+              segment_t = (t - MIDPOINT) * SEGMENT_SCALE;  // Map 0.5-1.0 to 0.0-1.0
+              x = lerp_i(CX, x_sink, segment_t);
+              y = lerp_i(CY, y_sink, segment_t);
             }
 
             set_dot_centered(dot, x, y);
 
-            // fade only at true endpoints (based on raw time)
+            // Fade at the very start and very end of full journey
             float a = 1.0f;
             if (t < FADE) a = t / FADE;
             else if (t > (1.0f - FADE)) a = (1.0f - t) / FADE;
@@ -357,14 +348,14 @@ interval:
           };
 
           auto animate = [&](lv_obj_t* dot, float eased_t, float watts,
-                   int x0, int y0, int x1, int y1) {
+                   int x_src, int y_src, int x_sink, int y_sink) {
             if (watts < THRESH_W) {
               hide_dot(dot);          // fully hidden when inactive
               return;
             }
 
             show_dot(dot);            // visible only when active
-            place_on_via_center(dot, eased_t, x0, y0, CX, CY, x1, y1);
+            place_on_two_segment_path(dot, eased_t, x_src, y_src, x_sink, y_sink);
           };
 
 
@@ -461,32 +452,94 @@ interval:
 
           if (max_active < THRESH_W) {
             hide_dot(id(dot_solar_home));
+            hide_dot(id(dot_solar_home_2));
+            hide_dot(id(dot_solar_home_3));
             hide_dot(id(dot_solar_batt));
+            hide_dot(id(dot_solar_batt_2));
+            hide_dot(id(dot_solar_batt_3));
             hide_dot(id(dot_solar_grid));
+            hide_dot(id(dot_solar_grid_2));
+            hide_dot(id(dot_solar_grid_3));
             hide_dot(id(dot_grid_home));
+            hide_dot(id(dot_grid_home_2));
+            hide_dot(id(dot_grid_home_3));
             hide_dot(id(dot_grid_batt));
+            hide_dot(id(dot_grid_batt_2));
+            hide_dot(id(dot_grid_batt_3));
             hide_dot(id(dot_batt_home));
+            hide_dot(id(dot_batt_home_2));
+            hide_dot(id(dot_batt_home_3));
             hide_dot(id(dot_batt_grid));
+            hide_dot(id(dot_batt_grid_2));
+            hide_dot(id(dot_batt_grid_3));
             return;
           }
 
-          id(ph_master) = advance_master_phase(id(ph_master), max_active);
+          // Calculate elapsed time since last update
+          const uint32_t now = millis();
+          const uint32_t last_anim = id(g_last_anim_ms);
+          uint32_t elapsed_ms;
+          
+          // Handle first run and uint32_t overflow (millis() rolls over every ~49.7 days)
+          if (last_anim == 0 || now < last_anim) {
+            elapsed_ms = DEFAULT_FRAME_MS;
+          } else {
+            elapsed_ms = now - last_anim;
+          }
+          
+          const float dt_seconds = (float)elapsed_ms / 1000.0f;
+          id(g_last_anim_ms) = now;
 
-          // Apply easing ONCE, shared by all dots
-          const float eased_t = ease_cubic_in_out(id(ph_master));
+          id(ph_master) = advance_master_phase(id(ph_master), max_active, dt_seconds);
+
+          // Calculate phases for 3 dots evenly spaced (120° apart)
+          const float phase_offset_1 = 1.0f / 3.0f;
+          const float phase_offset_2 = 2.0f / 3.0f;
+          
+          const float phase_1 = id(ph_master);
+          const float phase_2 = fmodf(id(ph_master) + phase_offset_1, 1.0f);
+          const float phase_3 = fmodf(id(ph_master) + phase_offset_2, 1.0f);
+
+          // Apply easing to each phase
+          const float eased_t1 = ease_linear(phase_1);
+          const float eased_t2 = ease_linear(phase_2);
+          const float eased_t3 = ease_linear(phase_3);
 
           // ------------------------------------------------------------
           // Animate all flows (inactive ones hidden automatically)
+          // Dots move source → center → sink in two segments
           // ------------------------------------------------------------
-          animate(id(dot_solar_home), eased_t, f_s2h, SX, SY, HX, HY);
-          animate(id(dot_solar_batt), eased_t, f_s2b, SX, SY, BX, BY);
-          animate(id(dot_solar_grid), eased_t, f_s2g, SX, SY, GX, GY);
+          
+          // Solar flows (yellow dots)
+          animate(id(dot_solar_home),   eased_t1, f_s2h, SX, SY, HX, HY);
+          animate(id(dot_solar_home_2), eased_t2, f_s2h, SX, SY, HX, HY);
+          animate(id(dot_solar_home_3), eased_t3, f_s2h, SX, SY, HX, HY);
+          
+          animate(id(dot_solar_batt),   eased_t1, f_s2b, SX, SY, BX, BY);
+          animate(id(dot_solar_batt_2), eased_t2, f_s2b, SX, SY, BX, BY);
+          animate(id(dot_solar_batt_3), eased_t3, f_s2b, SX, SY, BX, BY);
+          
+          animate(id(dot_solar_grid),   eased_t1, f_s2g, SX, SY, GX, GY);
+          animate(id(dot_solar_grid_2), eased_t2, f_s2g, SX, SY, GX, GY);
+          animate(id(dot_solar_grid_3), eased_t3, f_s2g, SX, SY, GX, GY);
 
-          animate(id(dot_grid_home),  eased_t, f_g2h, GX, GY, HX, HY);
-          animate(id(dot_grid_batt),  eased_t, f_g2b, GX, GY, BX, BY);
+          // Grid flows (gray dots)
+          animate(id(dot_grid_home),    eased_t1, f_g2h, GX, GY, HX, HY);
+          animate(id(dot_grid_home_2),  eased_t2, f_g2h, GX, GY, HX, HY);
+          animate(id(dot_grid_home_3),  eased_t3, f_g2h, GX, GY, HX, HY);
+          
+          animate(id(dot_grid_batt),    eased_t1, f_g2b, GX, GY, BX, BY);
+          animate(id(dot_grid_batt_2),  eased_t2, f_g2b, GX, GY, BX, BY);
+          animate(id(dot_grid_batt_3),  eased_t3, f_g2b, GX, GY, BX, BY);
 
-          animate(id(dot_batt_home),  eased_t, f_b2h, BX, BY, HX, HY);
-          animate(id(dot_batt_grid),  eased_t, f_b2g, BX, BY, GX, GY);
+          // Battery flows (green dots)
+          animate(id(dot_batt_home),    eased_t1, f_b2h, BX, BY, HX, HY);
+          animate(id(dot_batt_home_2),  eased_t2, f_b2h, BX, BY, HX, HY);
+          animate(id(dot_batt_home_3),  eased_t3, f_b2h, BX, BY, HX, HY);
+          
+          animate(id(dot_batt_grid),    eased_t1, f_b2g, BX, BY, GX, GY);
+          animate(id(dot_batt_grid_2),  eased_t2, f_b2g, BX, BY, GX, GY);
+          animate(id(dot_batt_grid_3),  eased_t3, f_b2g, BX, BY, GX, GY);
 
           // ---- RX pulse dot (rate-limited to 1 Hz) ----
           {
@@ -654,7 +707,47 @@ lvgl:
             floating: true
 
         - obj:
+            id: dot_solar_home_2
+            width: 12
+            height: 12
+            radius: 6
+            bg_color: ${c_line_yellow}
+            bg_opa: 0%
+            border_width: 0
+            floating: true
+
+        - obj:
+            id: dot_solar_home_3
+            width: 12
+            height: 12
+            radius: 6
+            bg_color: ${c_line_yellow}
+            bg_opa: 0%
+            border_width: 0
+            floating: true
+
+        - obj:
             id: dot_solar_batt
+            width: 12
+            height: 12
+            radius: 6
+            bg_color: ${c_line_yellow}
+            bg_opa: 0%
+            border_width: 0
+            floating: true
+
+        - obj:
+            id: dot_solar_batt_2
+            width: 12
+            height: 12
+            radius: 6
+            bg_color: ${c_line_yellow}
+            bg_opa: 0%
+            border_width: 0
+            floating: true
+
+        - obj:
+            id: dot_solar_batt_3
             width: 12
             height: 12
             radius: 6
@@ -674,7 +767,47 @@ lvgl:
             floating: true
 
         - obj:
+            id: dot_solar_grid_2
+            width: 12
+            height: 12
+            radius: 6
+            bg_color: ${c_line_yellow}
+            bg_opa: 0%
+            border_width: 0
+            floating: true
+
+        - obj:
+            id: dot_solar_grid_3
+            width: 12
+            height: 12
+            radius: 6
+            bg_color: ${c_line_yellow}
+            bg_opa: 0%
+            border_width: 0
+            floating: true
+
+        - obj:
             id: dot_grid_home
+            width: 12
+            height: 12
+            radius: 6
+            bg_color: ${c_line_neutral}
+            bg_opa: 0%
+            border_width: 0
+            floating: true
+
+        - obj:
+            id: dot_grid_home_2
+            width: 12
+            height: 12
+            radius: 6
+            bg_color: ${c_line_neutral}
+            bg_opa: 0%
+            border_width: 0
+            floating: true
+
+        - obj:
+            id: dot_grid_home_3
             width: 12
             height: 12
             radius: 6
@@ -694,6 +827,26 @@ lvgl:
             floating: true
 
         - obj:
+            id: dot_grid_batt_2
+            width: 12
+            height: 12
+            radius: 6
+            bg_color: ${c_line_neutral}
+            bg_opa: 0%
+            border_width: 0
+            floating: true
+
+        - obj:
+            id: dot_grid_batt_3
+            width: 12
+            height: 12
+            radius: 6
+            bg_color: ${c_line_neutral}
+            bg_opa: 0%
+            border_width: 0
+            floating: true
+
+        - obj:
             id: dot_batt_home
             width: 12
             height: 12
@@ -704,7 +857,47 @@ lvgl:
             floating: true
 
         - obj:
+            id: dot_batt_home_2
+            width: 12
+            height: 12
+            radius: 6
+            bg_color: ${c_line_green}
+            bg_opa: 0%
+            border_width: 0
+            floating: true
+
+        - obj:
+            id: dot_batt_home_3
+            width: 12
+            height: 12
+            radius: 6
+            bg_color: ${c_line_green}
+            bg_opa: 0%
+            border_width: 0
+            floating: true
+
+        - obj:
             id: dot_batt_grid
+            width: 12
+            height: 12
+            radius: 6
+            bg_color: ${c_line_green}
+            bg_opa: 0%
+            border_width: 0
+            floating: true
+
+        - obj:
+            id: dot_batt_grid_2
+            width: 12
+            height: 12
+            radius: 6
+            bg_color: ${c_line_green}
+            bg_opa: 0%
+            border_width: 0
+            floating: true
+
+        - obj:
+            id: dot_batt_grid_3
             width: 12
             height: 12
             radius: 6
