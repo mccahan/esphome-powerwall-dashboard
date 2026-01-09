@@ -81,11 +81,11 @@ else
     exit 1
 fi
 
-# Check manifest
+# Check manifest - verify ESP32-S3 config and correct flash offsets
 if grep -q "ESP32-S3" docs/manifest.json && \
-   grep -q "firmware.bin" docs/manifest.json && \
-   grep -q "bootloader.bin" docs/manifest.json && \
-   grep -q "partitions.bin" docs/manifest.json && \
+   grep -q '"path": "firmware.bin"' docs/manifest.json && \
+   grep -q '"path": "bootloader.bin"' docs/manifest.json && \
+   grep -q '"path": "partitions.bin"' docs/manifest.json && \
    grep -q '"offset": 0' docs/manifest.json && \
    grep -q '"offset": 32768' docs/manifest.json && \
    grep -q '"offset": 65536' docs/manifest.json; then

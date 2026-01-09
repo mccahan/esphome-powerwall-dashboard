@@ -48,8 +48,8 @@ jobs:
       run: |
         mkdir -p docs
         cp .pio/build/esp32-s3-devkitc-1/firmware.bin docs/firmware.bin || echo "Firmware not found, will be generated on first successful build"
-        cp .pio/build/esp32-s3-devkitc-1/bootloader.bin docs/bootloader.bin || echo "Bootloader not found"
-        cp .pio/build/esp32-s3-devkitc-1/partitions.bin docs/partitions.bin || echo "Partitions not found"
+        cp .pio/build/esp32-s3-devkitc-1/bootloader.bin docs/bootloader.bin || echo "Bootloader not found, will be generated on first successful build"
+        cp .pio/build/esp32-s3-devkitc-1/partitions.bin docs/partitions.bin || echo "Partitions not found, will be generated on first successful build"
     
     - name: Upload firmware artifact
       uses: actions/upload-artifact@v4
