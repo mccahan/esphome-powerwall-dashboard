@@ -291,18 +291,9 @@ interval:
           };
 
 
-          // Cubic ease-in-out that never fully stops (non-zero slope at ends)
-          auto ease_cubic_in_out = [&](float t) -> float {
-            t = clampf(t, 0.0f, 1.0f);
-
-            // standard cubic in/out
-            float cubic = (t < 0.5f)
-              ? 4.0f * t * t * t
-              : 1.0f - powf(-2.0f * t + 2.0f, 3.0f) * 0.5f;
-
-            // blend in a small linear component to keep motion alive
-            const float k = 0.06f;   // 0 = full stop, ~0.04–0.08 feels good on LVGL
-            return cubic * (1.0f - k) + t * k;
+          // Linear easing (no easing, just returns t)
+          auto ease_linear = [&](float t) -> float {
+            return clampf(t, 0.0f, 1.0f);
           };
 
 
@@ -317,39 +308,33 @@ interval:
           };
 
           // ------------------------------------------------------------
-          // Place dot along SOURCE → CENTER → SINK
-          // using EASED normalized time
+          // Place dot on a two-segment path: source → center → sink
+          // Phase 0.0-0.5: source → center
+          // Phase 0.5-1.0: center → sink
           // ------------------------------------------------------------
-          auto place_on_via_center = [&](lv_obj_t* dot, float t,
-                                         int x0, int y0,
-                                         int xc, int yc,
-                                         int x1, int y1) {
+          auto place_on_two_segment_path = [&](lv_obj_t* dot, float t,
+                                                int x_src, int y_src,
+                                                int x_sink, int y_sink) {
             t = clampf(t, 0.0f, 1.0f);
 
-            float dx0 = (float)(xc - x0), dy0 = (float)(yc - y0);
-            float dx1 = (float)(x1 - xc), dy1 = (float)(y1 - yc);
-
-            float len0 = sqrtf(dx0*dx0 + dy0*dy0);
-            float len1 = sqrtf(dx1*dx1 + dy1*dy1);
-            float total = len0 + len1;
-            if (total < 1e-3f) total = 1.0f;
-
-            float s = t * total;
-
             int x, y;
-            if (s <= len0 || len1 < 1e-3f) {
-              float u = (len0 < 1e-3f) ? 1.0f : (s / len0);
-              x = lerp_i(x0, xc, u);
-              y = lerp_i(y0, yc, u);
+            float segment_t;
+            
+            if (t < 0.5f) {
+              // First segment: source → center
+              segment_t = t * 2.0f;  // Map 0.0-0.5 to 0.0-1.0
+              x = lerp_i(x_src, CX, segment_t);
+              y = lerp_i(y_src, CY, segment_t);
             } else {
-              float u = (s - len0) / len1;
-              x = lerp_i(xc, x1, u);
-              y = lerp_i(yc, y1, u);
+              // Second segment: center → sink
+              segment_t = (t - 0.5f) * 2.0f;  // Map 0.5-1.0 to 0.0-1.0
+              x = lerp_i(CX, x_sink, segment_t);
+              y = lerp_i(CY, y_sink, segment_t);
             }
 
             set_dot_centered(dot, x, y);
 
-            // fade only at true endpoints (based on raw time)
+            // Fade at the very start and very end of full journey
             float a = 1.0f;
             if (t < FADE) a = t / FADE;
             else if (t > (1.0f - FADE)) a = (1.0f - t) / FADE;
@@ -357,14 +342,14 @@ interval:
           };
 
           auto animate = [&](lv_obj_t* dot, float eased_t, float watts,
-                   int x0, int y0, int x1, int y1) {
+                   int x_src, int y_src, int x_sink, int y_sink) {
             if (watts < THRESH_W) {
               hide_dot(dot);          // fully hidden when inactive
               return;
             }
 
             show_dot(dot);            // visible only when active
-            place_on_via_center(dot, eased_t, x0, y0, CX, CY, x1, y1);
+            place_on_two_segment_path(dot, eased_t, x_src, y_src, x_sink, y_sink);
           };
 
 
@@ -495,13 +480,16 @@ interval:
           const float phase_3 = fmodf(id(ph_master) + phase_offset_2, 1.0f);
 
           // Apply easing to each phase
-          const float eased_t1 = ease_cubic_in_out(phase_1);
-          const float eased_t2 = ease_cubic_in_out(phase_2);
-          const float eased_t3 = ease_cubic_in_out(phase_3);
+          const float eased_t1 = ease_linear(phase_1);
+          const float eased_t2 = ease_linear(phase_2);
+          const float eased_t3 = ease_linear(phase_3);
 
           // ------------------------------------------------------------
           // Animate all flows (inactive ones hidden automatically)
+          // Dots move source → center → sink in two segments
           // ------------------------------------------------------------
+          
+          // Solar flows (yellow dots)
           animate(id(dot_solar_home),   eased_t1, f_s2h, SX, SY, HX, HY);
           animate(id(dot_solar_home_2), eased_t2, f_s2h, SX, SY, HX, HY);
           animate(id(dot_solar_home_3), eased_t3, f_s2h, SX, SY, HX, HY);
@@ -514,6 +502,7 @@ interval:
           animate(id(dot_solar_grid_2), eased_t2, f_s2g, SX, SY, GX, GY);
           animate(id(dot_solar_grid_3), eased_t3, f_s2g, SX, SY, GX, GY);
 
+          // Grid flows (gray dots)
           animate(id(dot_grid_home),    eased_t1, f_g2h, GX, GY, HX, HY);
           animate(id(dot_grid_home_2),  eased_t2, f_g2h, GX, GY, HX, HY);
           animate(id(dot_grid_home_3),  eased_t3, f_g2h, GX, GY, HX, HY);
@@ -522,6 +511,7 @@ interval:
           animate(id(dot_grid_batt_2),  eased_t2, f_g2b, GX, GY, BX, BY);
           animate(id(dot_grid_batt_3),  eased_t3, f_g2b, GX, GY, BX, BY);
 
+          // Battery flows (green dots)
           animate(id(dot_batt_home),    eased_t1, f_b2h, BX, BY, HX, HY);
           animate(id(dot_batt_home_2),  eased_t2, f_b2h, BX, BY, HX, HY);
           animate(id(dot_batt_home_3),  eased_t3, f_b2h, BX, BY, HX, HY);
