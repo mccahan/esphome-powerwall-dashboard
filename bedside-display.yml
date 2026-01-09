@@ -480,7 +480,7 @@ interval:
           const uint32_t last_anim = id(g_last_anim_ms);
           uint32_t elapsed_ms;
           
-          // Handle first run and millis() rollover (every ~49.7 days)
+          // Handle first run and uint32_t overflow (millis() rolls over every ~49.7 days)
           if (last_anim == 0 || now < last_anim) {
             elapsed_ms = DEFAULT_FRAME_MS;
           } else {
