@@ -261,7 +261,7 @@ interval:
           const float THRESH_W = 50.0f;
           const float FADE = 0.12f;
           const int DOT_R = 6;
-          const uint32_t DEFAULT_FRAME_MS = 33;  // Initial frame time assumption (~30 FPS)
+          const uint32_t DEFAULT_FRAME_MS = 1000 / 30;  // ~30 FPS initial assumption
 
           // ------------------------------------------------------------
           // Helpers
