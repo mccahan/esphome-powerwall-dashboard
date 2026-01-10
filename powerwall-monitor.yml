@@ -301,7 +301,7 @@ interval:
           // Master phase (shared by all dots)
           // ------------------------------------------------------------
           auto advance_master_phase = [&](float ph, float max_watts_active, float dt_seconds) -> float {
-            float speed = clampf(max_watts_active / 2500.0f, 0.18f, 1.35f);
+            float speed = clampf(max_watts_active / 2500.0f, 0.18f, 0.25f);
             ph += speed * dt_seconds;
             if (ph >= 1.0f) ph -= floorf(ph);
             return ph;
@@ -385,10 +385,18 @@ interval:
           float rem_batt  = batt_sink;
           float rem_grid  = grid_sink;
 
+          // Mark solar as disabled with overlay when inactive
           if (rem_solar < 100) {
             lv_obj_clear_flag(solar_disable_overlay, LV_OBJ_FLAG_HIDDEN);
           } else {
             lv_obj_add_flag(solar_disable_overlay, LV_OBJ_FLAG_HIDDEN);
+          }
+
+          // Mark battery as disabled with overlay when inactive
+          if (batt_w > -100 && batt_w < 100) {
+            lv_obj_clear_flag(battery_disable_overlay, LV_OBJ_FLAG_HIDDEN);
+          } else {
+            lv_obj_add_flag(battery_disable_overlay, LV_OBJ_FLAG_HIDDEN);
           }
 
           if (rem_solar > 0 && rem_batt > 0 && soc < 99.5f) {
@@ -920,6 +928,19 @@ lvgl:
             floating: true
             x: 205
             y: 31
+            radius: 0
+            bg_opa: 80%
+            border_opa: TRANSP
+            hidden: true
+
+        - obj:
+            id: battery_disable_overlay
+            width: 70
+            height: 106
+            bg_color: "0x0A0C10"
+            floating: true
+            x: 206
+            y: 265
             radius: 0
             bg_opa: 80%
             border_opa: TRANSP
