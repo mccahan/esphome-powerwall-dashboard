@@ -19,6 +19,34 @@ time:
     timezone: $timezone
     id: system_time
     update_interval: 360min   # Change sync interval from default 5min to 6 hours
+    on_time_sync:
+      # Set correct brightness mode based on current time when SNTP syncs
+      then:
+        - lambda: |-
+            auto time = id(system_time).now();
+            int hour = time.hour;
+            int minute = time.minute;
+            
+            // Convert night time settings to minutes for comparison
+            int night_start_minutes = ${screen_night_hour} * 60 + ${screen_night_minute};
+            int current_minutes = hour * 60 + minute;
+            
+            // Sunrise is approximately 6 AM, sunset calculation uses sun component
+            // For initial sync, use simple hour-based logic
+            if (current_minutes >= night_start_minutes || hour < 6) {
+              // Between night time and 6 AM = Night mode
+              id(brightness_mode).publish_state("Night");
+            } else if (hour >= 6 && hour < 12) {
+              // Morning/Day
+              id(brightness_mode).publish_state("Day");
+            } else {
+              // Afternoon/Evening - will be refined by sun component
+              // Use current selection or default to Day
+              if (id(brightness_mode).state == "") {
+                id(brightness_mode).publish_state("Day");
+              }
+            }
+            ESP_LOGI("brightness", "Time synced, setting mode based on current time %02d:%02d", hour, minute);
     on_time:
       - seconds: 0
         minutes: $screen_night_minute
