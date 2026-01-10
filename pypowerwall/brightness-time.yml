@@ -16,6 +16,7 @@ sun:
 
 time:
   - platform: sntp
+    timezone: $timezone
     id: system_time
     update_interval: 360min   # Change sync interval from default 5min to 6 hours
     on_time:
