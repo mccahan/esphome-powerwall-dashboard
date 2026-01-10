@@ -10,6 +10,8 @@ substitutions:
   # MQTT topic root for your pypowerwall2mqtt bridge (or your own topic scheme)
   pypowerwall_prefix: "pypowerwall"
 
+  timezone: "America/Denver"
+
   # Colors
   c_bg: "0x0A0C10"
   c_white: "white"
