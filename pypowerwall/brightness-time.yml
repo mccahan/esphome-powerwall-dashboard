@@ -19,6 +19,34 @@ time:
     timezone: $timezone
     id: system_time
     update_interval: 360min   # Change sync interval from default 5min to 6 hours
+    on_time_sync:
+      # Set correct brightness mode based on current time when SNTP syncs
+      then:
+        - lambda: |-
+            auto time = id(system_time).now();
+            int hour = time.hour;
+            int minute = time.minute;
+            
+            // Convert night time settings to minutes for comparison
+            int night_start_minutes = ${screen_night_hour} * 60 + ${screen_night_minute};
+            int current_minutes = hour * 60 + minute;
+            
+            // Sunrise is approximately 6 AM, sunset calculation uses sun component
+            // For initial sync, use simple hour-based logic
+            if (current_minutes >= night_start_minutes || hour < 6) {
+              // Between night time and 6 AM = Night mode
+              id(brightness_mode).publish_state("Night");
+            } else if (hour >= 6 && hour < 12) {
+              // Morning/Day
+              id(brightness_mode).publish_state("Day");
+            } else {
+              // Afternoon/Evening - will be refined by sun component
+              // Use current selection or default to Day
+              if (id(brightness_mode).state == "") {
+                id(brightness_mode).publish_state("Day");
+              }
+            }
+            ESP_LOGI("brightness", "Time synced, setting mode based on current time %02d:%02d", hour, minute);
     on_time:
       - seconds: 0
         minutes: $screen_night_minute
@@ -27,6 +55,17 @@ time:
           - select.set:
               id: brightness_mode
               option: "Night"
+      # Burn-in prevention: exercise pixels 4 times per night for 30 minutes each
+      - hours: 2,3,4,5
+        minutes: 5
+        seconds: 0
+        then:
+          - switch.turn_on: switch_antiburn
+      - hours: 2,3,4,5
+        minutes: 35
+        seconds: 0
+        then:
+          - switch.turn_off: switch_antiburn
 
 lvgl:
   on_idle:
@@ -60,6 +99,11 @@ touchscreen:
     on_touch:
       then:
         - logger.log: "LVGL is active"
+        # Stop antiburn if active
+        - if:
+            condition: lvgl.is_paused
+            then:
+              - switch.turn_off: switch_antiburn
         - lvgl.resume
         - lvgl.widget.redraw
         - if:
@@ -68,21 +112,48 @@ touchscreen:
             then:
               - light.turn_on:
                   id: display_backlight
-                  brightness: ${touchscreen_daytime_brightness}
+                  brightness: 100%  # 80% + 30% = 110%, capped at 100%
         - if:
             condition:
               - lambda: 'return id(brightness_mode).current_option() == "Evening";'
             then:
               - light.turn_on:
                   id: display_backlight
-                  brightness: ${touchscreen_nighttime_brightness}
+                  brightness: 80%  # 50% + 30% = 80%
         - if:
             condition:
               - lambda: 'return id(brightness_mode).current_option() == "Night";'
             then:
               - light.turn_on:
                   id: display_backlight
-                  brightness: ${touchscreen_nighttime_brightness}
+                  brightness: 30%  # Night mode off + 30% boost = 30%
+
+# Anti-burn switch for LCD burn-in prevention
+switch:
+  - platform: template
+    name: "Antiburn"
+    id: switch_antiburn
+    icon: mdi:television-shimmer
+    optimistic: true
+    entity_category: "config"
+    turn_on_action:
+      - logger.log: "Starting Antiburn"
+      - if:
+          condition: lvgl.is_paused
+          then:
+            - lvgl.resume:
+            - lvgl.widget.redraw:
+      - lvgl.pause:
+          show_snow: true
+      # Turn off backlight during antiburn to save power and avoid disturbing users
+      - light.turn_off: display_backlight
+    turn_off_action:
+      - logger.log: "Stopping Antiburn"
+      - if:
+          condition: lvgl.is_paused
+          then:
+            - lvgl.resume:
+            - lvgl.widget.redraw:
 
 # Brightness mode field
 select:
@@ -118,6 +189,6 @@ select:
             condition:
               - lambda: 'return id(brightness_mode).current_option() == "Night";'
             then:
-              - light.turn_on:
-                  id: display_backlight
-                  brightness: ${touchscreen_nighttime_brightness}
+              - light.turn_off: display_backlight
+              - lvgl.pause:
+                  show_snow: true
