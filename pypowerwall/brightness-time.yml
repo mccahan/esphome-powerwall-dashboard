@@ -68,21 +68,21 @@ touchscreen:
             then:
               - light.turn_on:
                   id: display_backlight
-                  brightness: ${touchscreen_daytime_brightness}
+                  brightness: 100%  # 80% + 30% = 110%, capped at 100%
         - if:
             condition:
               - lambda: 'return id(brightness_mode).current_option() == "Evening";'
             then:
               - light.turn_on:
                   id: display_backlight
-                  brightness: ${touchscreen_nighttime_brightness}
+                  brightness: 80%  # 50% + 30% = 80%
         - if:
             condition:
               - lambda: 'return id(brightness_mode).current_option() == "Night";'
             then:
               - light.turn_on:
                   id: display_backlight
-                  brightness: ${touchscreen_nighttime_brightness}
+                  brightness: 30%  # Night mode off + 30% boost = 30%
 
 # Brightness mode field
 select:
@@ -118,6 +118,6 @@ select:
             condition:
               - lambda: 'return id(brightness_mode).current_option() == "Night";'
             then:
-              - light.turn_on:
-                  id: display_backlight
-                  brightness: ${touchscreen_nighttime_brightness}
+              - light.turn_off: display_backlight
+              - lvgl.pause:
+                  show_snow: true
