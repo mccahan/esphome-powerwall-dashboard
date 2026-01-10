@@ -135,6 +135,11 @@ globals:
   - id: g_last_anim_ms
     type: uint32_t
     initial_value: "0"
+  
+  # MQTT connection status
+  - id: g_mqtt_connected
+    type: bool
+    initial_value: "false"
 
 # -------------------------------------------------------------------
 # MQTT (subscribe to pypowerwall topics)
@@ -149,6 +154,16 @@ mqtt:
   log_topic:
     topic: bedside-display/log
     level: INFO
+
+  on_connect:
+    - lambda: |-
+        id(g_mqtt_connected) = true;
+        lv_obj_add_flag(id(mqtt_error_icon), LV_OBJ_FLAG_HIDDEN);
+
+  on_disconnect:
+    - lambda: |-
+        id(g_mqtt_connected) = false;
+        lv_obj_clear_flag(id(mqtt_error_icon), LV_OBJ_FLAG_HIDDEN);
 
   on_message:
     # Grid (watts) - negative means exporting
@@ -617,6 +632,27 @@ lvgl:
             border_width: 0
             hidden: true
             floating: true
+
+        # MQTT connection error indicator (top right)
+        - obj:
+            id: mqtt_error_icon
+            x: 440
+            y: 8
+            width: 14
+            height: 14
+            radius: 2
+            bg_color: "0xFF0000"
+            bg_opa: 100%
+            border_width: 1
+            border_color: "0xFFFFFF"
+            hidden: false
+            floating: true
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "!"
+                  text_font: space_bold
+                  text_color: "0xFFFFFF"
 
         - label:
             id: lbl_batt_val
