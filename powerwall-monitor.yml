@@ -275,7 +275,9 @@ mqtt:
         - lambda: |-
             if (x.length() > 0) {
               lv_label_set_text(id(lbl_time_remaining), (x + " #6A6A6A hours#").c_str());
-              lv_obj_clear_flag(id(lbl_time_remaining), LV_OBJ_FLAG_HIDDEN);
+              if (id(offgrid)) {
+                lv_obj_clear_flag(id(lbl_time_remaining), LV_OBJ_FLAG_HIDDEN);
+              }
             } else {
               lv_obj_add_flag(id(lbl_time_remaining), LV_OBJ_FLAG_HIDDEN);
             }
