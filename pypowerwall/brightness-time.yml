@@ -42,7 +42,7 @@ time:
             } else {
               // Afternoon/Evening - will be refined by sun component
               // Use current selection or default to Day
-              if (id(brightness_mode).state == "") {
+              if (id(brightness_mode).current_option() == "") {
                 id(brightness_mode).publish_state("Day");
               }
             }

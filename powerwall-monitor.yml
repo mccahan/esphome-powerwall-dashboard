@@ -95,9 +95,13 @@ font:
     size: 30
 
 image:
-  - file: "assets/layout.png"
+  - file: "assets/layout.svg"
     type: RGB565
     id: layout
+    transparency: alpha_channel
+  - file: "assets/grid_offline.svg"
+    type: RGB565
+    id: grid_offline
     transparency: alpha_channel
 
 # -------------------------------------------------------------------
@@ -119,6 +123,9 @@ globals:
   - id: g_soc
     type: float
     initial_value: "0"
+  - id: offgrid
+    type: bool
+    initial_value: "false"
 
   # animation phases (0..1)
   - id: ph_master
@@ -236,10 +243,44 @@ mqtt:
             char buf[16];
             snprintf(buf, sizeof(buf), "%d#6A6A6A %%#", (int) lroundf(soc));
             lv_label_set_text(id(lbl_soc), buf);
+            lv_label_set_text(id(lbl_soc_offgrid), buf);
 
             // progress bar
             lv_bar_set_value(id(bar_soc), (int) lroundf(soc), LV_ANIM_OFF);
             id(g_last_data_ms) = millis();
+    
+    # Off-grid
+    - topic: ${pypowerwall_prefix}/site/offgrid
+      then:
+        - lambda: |-
+            if (x == "1") {
+              id(offgrid) = true;
+              lv_obj_clear_flag(grid_disable_overlay, LV_OBJ_FLAG_HIDDEN);
+              lv_obj_clear_flag(lbl_soc_offgrid, LV_OBJ_FLAG_HIDDEN);
+              lv_obj_clear_flag(lbl_time_remaining, LV_OBJ_FLAG_HIDDEN);
+              lv_obj_add_flag(lbl_soc, LV_OBJ_FLAG_HIDDEN);
+              lv_obj_add_flag(lbl_grid_val, LV_OBJ_FLAG_HIDDEN);
+            } else {
+              id(offgrid) = false;
+              lv_obj_add_flag(grid_disable_overlay, LV_OBJ_FLAG_HIDDEN);
+              lv_obj_add_flag(lbl_soc_offgrid, LV_OBJ_FLAG_HIDDEN);
+              lv_obj_add_flag(lbl_time_remaining, LV_OBJ_FLAG_HIDDEN);
+              lv_obj_clear_flag(lbl_soc, LV_OBJ_FLAG_HIDDEN);
+              lv_obj_clear_flag(lbl_grid_val, LV_OBJ_FLAG_HIDDEN);
+            }
+
+    # Battery time remaining
+    - topic: ${pypowerwall_prefix}/battery/time_remaining
+      then:
+        - lambda: |-
+            if (x.length() > 0) {
+              lv_label_set_text(id(lbl_time_remaining), (x + " #6A6A6A hours#").c_str());
+              lv_obj_clear_flag(id(lbl_time_remaining), LV_OBJ_FLAG_HIDDEN);
+            } else {
+              lv_obj_add_flag(id(lbl_time_remaining), LV_OBJ_FLAG_HIDDEN);
+            }
+        
+          
 
 # -------------------------------------------------------------------
 # Dot animation (FULL source -> sink paths)
@@ -670,23 +711,51 @@ lvgl:
         - label:
             id: lbl_soc
             x: 0
-            y: 411
+            y: 413
             width: 480
             height: 39
             text_align: center
-            text: "0%"
+            text: " "
             text_font: space_bold_large
             text_color: "${c_white}"
             floating: true
             recolor: true
 
+        - label:
+            id: lbl_soc_offgrid
+            x: 84
+            y: 413
+            width: 94
+            height: 39
+            text_align: left
+            text: " "
+            text_font: space_bold_large
+            text_color: "${c_white}"
+            floating: true
+            recolor: true
+            hidden: true
+        
+        - label:
+            id: lbl_time_remaining
+            x: 150
+            y: 413
+            width: 250
+            height: 39
+            text_align: right
+            text: " "
+            text_font: space_bold_large
+            text_color: "${c_white}"
+            floating: true
+            recolor: true
+            hidden: true
+
         # SoC bar + %
         - bar:
             id: bar_soc
             x: 82
-            y: 457
+            y: 454
             width: 316
-            height: 9
+            height: 13
             min_value: 0
             max_value: 100
             value: 0
@@ -694,7 +763,7 @@ lvgl:
             bg_color: "0x16181C"
             floating: true
             border_width: 1
-            border_color: "0x2B2C30"
+            border_color: "0x5A5A5A"
             indicator:
               bg_color: "0x22C55E"
               bg_opa: 100%
@@ -946,6 +1015,13 @@ lvgl:
             radius: 0
             bg_opa: 80%
             border_opa: TRANSP
+            hidden: true
+
+        - image:
+            id: grid_disable_overlay
+            src: grid_offline
+            x: 77
+            y: 159
             hidden: true
 
         - obj:
