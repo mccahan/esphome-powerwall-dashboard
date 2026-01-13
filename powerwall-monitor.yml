@@ -255,14 +255,14 @@ mqtt:
         - lambda: |-
             if (x == "1") {
               id(offgrid) = true;
-              lv_obj_clear_flag(grid_disable_overlay, LV_OBJ_FLAG_HIDDEN);
+              lv_obj_clear_flag(grid_disconnected_overlay, LV_OBJ_FLAG_HIDDEN);
               lv_obj_clear_flag(lbl_soc_offgrid, LV_OBJ_FLAG_HIDDEN);
               lv_obj_clear_flag(lbl_time_remaining, LV_OBJ_FLAG_HIDDEN);
               lv_obj_add_flag(lbl_soc, LV_OBJ_FLAG_HIDDEN);
               lv_obj_add_flag(lbl_grid_val, LV_OBJ_FLAG_HIDDEN);
             } else {
               id(offgrid) = false;
-              lv_obj_add_flag(grid_disable_overlay, LV_OBJ_FLAG_HIDDEN);
+              lv_obj_add_flag(grid_disconnected_overlay, LV_OBJ_FLAG_HIDDEN);
               lv_obj_add_flag(lbl_soc_offgrid, LV_OBJ_FLAG_HIDDEN);
               lv_obj_add_flag(lbl_time_remaining, LV_OBJ_FLAG_HIDDEN);
               lv_obj_clear_flag(lbl_soc, LV_OBJ_FLAG_HIDDEN);
@@ -442,6 +442,13 @@ interval:
             lv_obj_clear_flag(battery_disable_overlay, LV_OBJ_FLAG_HIDDEN);
           } else {
             lv_obj_add_flag(battery_disable_overlay, LV_OBJ_FLAG_HIDDEN);
+          }
+
+          // Mark grid as disabled with overlay when inactive
+          if (grid_w > -100 && grid_w < 100) {
+            lv_obj_clear_flag(grid_disable_overlay, LV_OBJ_FLAG_HIDDEN);
+          } else {
+            lv_obj_add_flag(grid_disable_overlay, LV_OBJ_FLAG_HIDDEN);
           }
 
           if (rem_solar > 0 && rem_batt > 0 && soc < 99.5f) {
@@ -1033,8 +1040,21 @@ lvgl:
             border_opa: TRANSP
             hidden: true
 
-        - image:
+        - obj:
             id: grid_disable_overlay
+            width: 70
+            height: 106
+            bg_color: "0x0A0C10"
+            floating: true
+            x: 77
+            y: 159
+            radius: 0
+            bg_opa: 80%
+            border_opa: TRANSP
+            hidden: true
+
+        - image:
+            id: grid_disconnected_overlay
             src: grid_offline
             x: 77
             y: 159
